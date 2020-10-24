@@ -1068,8 +1068,8 @@ func (ss *Sim) SleepTrial() {
 	a := rnge
 	c := make([][]float64, 2)
 	for i := 0; i < 100000; i++ {
-		c[0] = append(c[0], (math.Cos(a[i]/1)/80 + 0.99))
-		c[1] = append(c[1], (math.Cos(a[i]/1)/30 + 0.99))
+		c[0] = append(c[0], (math.Cos(a[i]/1)/80 + 0.99)) //low oscillation
+		c[1] = append(c[1], (math.Cos(a[i]/1)/30 + 0.99)) //high oscillation
 	}
 	ss.SleepCyc(c)
 	ss.SlpCycPlot.GoUpdate()
