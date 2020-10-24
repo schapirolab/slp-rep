@@ -14,5 +14,4 @@ How to run:
 Variables that control sleep behaviour:
 The model relies on two mechanisms during sleep - (i) Synaptic Depression which allows the model to move between attractors (high stability periods) and (ii) Oscillating Inhibition which reveals useful contrastive learning states.
 Synaptic depression is controlled by the "inc" and "dec" parameters (line 463 in slp-rep.go) which specify the rate of increase and recovery from synaptic depression over time, respectively.
-
 Layers in the network recieve either high or low amplitude inhibitory oscillations (see from line 866 in slp-rep.go for the classification). The amplitude for each is controlled via two sin wave generating equations (see from line 1071 in slp-rep.go for the two equations).
