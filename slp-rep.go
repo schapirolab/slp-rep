@@ -1,7 +1,7 @@
 // Sleep-replay model developed in Emergent (www.github.com/emer/emergent)
 // Authors: Anna Schapiro, Dhairyya Singh
 
-// Slp-rep runs a hippocampal-cortical model on the Satellite learning task (see Schapiro et al. (2017))
+// slp-rep runs a hippocampal model on the structured satellite learning task (see Schapiro et al. (2017))
 package main
 
 import (
@@ -203,7 +203,7 @@ func (ss *Sim) New() {
 	ss.TestUpdt = leabra.AlphaCycle
 	ss.TestInterval = 1
 	ss.LogSetParams = false
-	ss.LayStatNms = []string{"F1", "F2", "F3", "F4", "F5", "ClassName", "CodeName", "CA1", "DG"}
+	ss.LayStatNms = []string{"F1", "F2", "F3", "F4", "F5", "ClassName", "CodeName", "CA1", "DG", "CA3"}
 	ss.TstNms = []string{"Sat"}
 	ss.TrialPerEpc = 105
 	ss.ShTrlNum = 0
@@ -427,6 +427,7 @@ func (ss *Sim) UpdateView(state string) { // changed from boolean to string
 	}
 }
 
+// SleepCycInit prepares the network for sleep
 func (ss *Sim) SleepCycInit() {
 
 	ss.Time.Reset()
@@ -457,18 +458,18 @@ func (ss *Sim) SleepCycInit() {
 		ss.UpdateView("sleep")
 	}
 
+	// inc and dec set the rate at which synaptic depression increases and recovers at each synapse
 	if ss.SynDep {
 		for _, ly := range
 		ss.Net.Layers {
-			inc := 0.0007 // 0.0015
-			dec := 0.0005 // 0.0005
+			inc := 0.0007 
+			dec := 0.0005 
 			ly.(*leabra.Layer).InitSdEffWt(float32(inc), float32(dec))
 		}
 	}
-
-
 }
 
+// BackToWake terminates sleep and sets the network up for wake training/testing again
 func (ss *Sim) BackToWake() {
 	// Effwt back to =Wt
 	if ss.SynDep {
@@ -665,13 +666,19 @@ func (ss *Sim) TrainTrial() {
 			if ss.EpcShPctCor >= 0.8 && ss.EpcUnPctCor >= 0.8{
 
 				if ss.ExecSleep{
-
-
-					fmt.Println([]string{strconv.FormatFloat(ss.EpcShPctCor , 'f', 6, 64), strconv.FormatFloat(ss.EpcUnPctCor , 'f', 6, 64), strconv.FormatFloat(ss.EpcShSSE , 'f', 6, 64), strconv.FormatFloat(ss.EpcUnSSE , 'f', 6, 64)})
+					// fmt.Println([]string{strconv.FormatFloat(ss.EpcShPctCor , 'f', 6, 64), strconv.FormatFloat(ss.EpcUnPctCor , 'f', 6, 64), strconv.FormatFloat(ss.EpcShSSE , 'f', 6, 64), strconv.FormatFloat(ss.EpcUnSSE , 'f', 6, 64)})
 					ss.SleepTrial()
-					fmt.Println(ss.EpcShPctCor, ss.EpcUnPctCor, ss.EpcShSSE, ss.EpcUnSSE)
+					fmt.Println("Pre-sleep - ")
+					fmt.Println("Shared Pct Correct:", ss.EpcShPctCor)
+					fmt.Println("Unique Pct Correct:", ss.EpcUnPctCor)
+					fmt.Println("Shared SSE:", ss.EpcShSSE)
+					fmt.Println("Unique SSE:", ss.EpcUnSSE)
 					ss.TestAll()
-					fmt.Println(ss.EpcShPctCor, ss.EpcUnPctCor, ss.EpcShSSE, ss.EpcUnSSE)
+					fmt.Println("Post-sleep - ")
+					fmt.Println("Shared Pct Correct:", ss.EpcShPctCor)
+					fmt.Println("Unique Pct Correct:", ss.EpcUnPctCor)
+					fmt.Println("Shared SSE:", ss.EpcShSSE)
+					fmt.Println("Unique SSE:", ss.EpcUnSSE)
 				}
 
 				ss.RunEnd()
@@ -806,19 +813,19 @@ func (ss *Sim) TrainTrial() {
 	ss.LogTrnTrl(ss.TrnTrlLog)
 }
 
-
+// SleepCyc runs one 30,000 cycle trial of sleep
 func (ss *Sim) SleepCyc(c [][]float64) {
 
 	viewUpdt := ss.SleepUpdt
-	//ss.Time.SleepCycStart()
 
-	ss.Net.WtFmDWt()
+	ss.Net.WtFmDWt() // Final weight updating before sleep
 
 	stablecount := 0
 	pluscount := 0
 	minuscount := 0
 	ss.SlpTrls = 0
 
+	// Recording all inhibition Gi parameters prior to sleep for the inhibitory oscillations
 	finhib := ss.Net.LayerByName("F1").(*leabra.Layer).Inhib.Layer.Gi
 	clinhib := ss.Net.LayerByName("ClassName").(*leabra.Layer).Inhib.Layer.Gi
 	coinhib := ss.Net.LayerByName("CodeName").(*leabra.Layer).Inhib.Layer.Gi
@@ -834,12 +841,13 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 	for _, ly := range perlys {
 		lyc := ss.Net.LayerByName(ly).(*leabra.Layer).AsLeabra()
 		lycfmca1 := lyc.RcvPrjns.SendName("CA1").(*hip.CHLPrjn)
-		lycfmca1.WtScale.Abs = 2
+		lycfmca1.WtScale.Abs = 2 // Increasing wtscaling from CA1 to perception layers leads to better replays
 	}
 
 	ss.Net.GScaleFmAvgAct() // update computed scaling factors
 	ss.Net.InitGInc()       // scaling params change, so need to recompute all netins
 
+	// Loop for the 30,000 cycle sleep trial
 	for cyc := 0; cyc < 30000; cyc++ {
 
 		ss.Net.WtFmDWt()
@@ -849,10 +857,10 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 
 		// Taking the prepared slice of oscil inhib values and producing the oscils in all perlys
 		if ss.InhibOscil {
-			inhibs := c
+			inhibs := c // c is the slice with the sinwave values for the oscillating inhibition
 			ss.InhibFactor = inhibs[0][cyc] // For sleep GUI counter and sleepcyclog
 
-			// Changing Inhibs back to default before next oscill cycle value so that the inhib values follow a sinwave
+			// Changing Inhibs back to default before next oscill cycle value so that the inhib values are set based on c values
 			perlys := []string{"F1", "F2", "F3", "F4", "F5"}
 			for _, ly := range perlys {
 				ss.Net.LayerByName(ly).(*leabra.Layer).Inhib.Layer.Gi = finhib
@@ -863,6 +871,8 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 			ss.Net.LayerByName("CA1").(*leabra.Layer).Inhib.Layer.Gi = ca1inhib
 			ss.Net.LayerByName("CA3").(*leabra.Layer).Inhib.Layer.Gi = ca3inhib
 
+			// Two groups - low layers recieve lower-amplitude inhibitiory oscillations while high layers recive high-amplitude oscillations.
+			// This is done to optimize oscillations for best minus-phases
 			lowlayers := []string{ "ClassName", "CA1", "CodeName"}
 			highlayers := []string{ "F1", "F2", "F3", "F4", "F5", "DG", "CA3"}
 
@@ -876,13 +886,12 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 			}
 		}
 
-		//DS: average network similarity
+		// Average network similarity is the "stability" measure. It tracks the cycle-updated temporal auto-correlation of activation values at each layer.
 		avesim := 0.0
 		tmpsim := 0.0
 		for _, lyc := range ss.Net.Layers {
 			ly := ss.Net.LayerByName(lyc.Name()).(*leabra.Layer)
 			tmpsim = ly.Sim
-			//fmt.Println(ly.Name(), tmpsim)
 			if math.IsNaN(tmpsim) {
 				tmpsim = 0
 			}
@@ -890,8 +899,8 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 		}
 		ss.AvgLaySim = avesim / 10
 
-		//If AvgLaySim falls below 0.9 - most likely because a layer has lost all act, random noise will be injected
-		//into the network to get it going again. The first 1000 cycles are skipped to let the network initially settle into an attractor.
+		// If AvgLaySim falls below 0.9 - most likely because a layer has lost all act, random noise will be injected
+		// into the network to get it going again. The first 1000 cycles are skipped to let the network initially settle into an attractor.
 		if ss.Time.Cycle > 200 && ss.AvgLaySim <= 0.8  && (ss.Time.Cycle % 50 == 0 || ss.Time.Cycle % 50 == 1 || ss.Time.Cycle % 50 == 2 || ss.Time.Cycle % 50 == 3 || ss.Time.Cycle % 50 == 4) {
 			for _, ly := range ss.Net.Layers {
 				for ni := range ly.(*leabra.Layer).Neurons {
@@ -916,10 +925,10 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 		// Mark plus or minus phase
 		if ss.SlpLearn {
 
-			plusthresh := 0.9999938129217251 + 0.0000055
-			minusthresh := 0.9999938129217251 - 0.001
+			plusthresh := 0.9999938129217251 + 0.0000055 // stability threshold for starting/ending plus phases
+			minusthresh := 0.9999938129217251 - 0.001 // threshold to end minus phases
 
-			// Checking if stable
+			// Checking if stable above threshold
 			if ss.PlusPhase == false && ss.MinusPhase == false {
 				if ss.AvgLaySim >= plusthresh {
 					stablecount++
@@ -929,8 +938,8 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 			}
 
 			// For a dual threshold model, checking here if network has been stable above plusthresh for 5 cycles
-			// Starting plus phase if criteria met
-			if stablecount == 5 && ss.AvgLaySim >= plusthresh && ss.PlusPhase == false && ss.MinusPhase == false { //&& ss.Time.Quarter == 0 {
+			// Starting plus phase if criterion met
+			if stablecount == 5 && ss.AvgLaySim >= plusthresh && ss.PlusPhase == false && ss.MinusPhase == false {
 				stablecount = 0
 				minuscount = 0
 				ss.PlusPhase = true
@@ -938,13 +947,13 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 				for _, ly := range ss.Net.Layers {
 					ly.(leabra.LeabraLayer).AsLeabra().RunSumUpdt(true)
 				}
-				fmt.Println(cyc, "plusphase begins")
-
+			// Continuing plus phase
 			} else if pluscount > 0 && ss.AvgLaySim >= plusthresh && ss.PlusPhase == true {
 				pluscount++
 				for _, ly := range ss.Net.Layers {
 					ly.(leabra.LeabraLayer).AsLeabra().RunSumUpdt(false)
 				}
+			// If stabilty measure falls below plus threshold, plus phase ends and minus phase begins
 			} else if ss.AvgLaySim < plusthresh && ss.AvgLaySim >= minusthresh && ss.PlusPhase == true {
 				ss.PlusPhase = false
 				ss.MinusPhase = true
@@ -955,13 +964,13 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 					ly.(leabra.LeabraLayer).AsLeabra().RunSumUpdt(true)
 				}
 				pluscount = 0
-				fmt.Println(cyc, "plusphase ends, minusphase begins")
-
+			// Continuing minus phase
 			} else if ss.AvgLaySim >= minusthresh && ss.MinusPhase == true {
 				minuscount++
 				for _, ly := range ss.Net.Layers {
 					ly.(leabra.LeabraLayer).AsLeabra().RunSumUpdt(false)
 				}
+			//	If stability measure falls below minus threshold, minus phase ends
 			} else if ss.AvgLaySim < minusthresh && ss.MinusPhase == true {
 				ss.MinusPhase = false
 
@@ -978,10 +987,10 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 						if p.IsOff() {
 							continue
 						}
-						p.(*hip.CHLPrjn).SlpDWt()
+						p.(*hip.CHLPrjn).SlpDWt() // Weight changes occuring here
 					}
 				}
-				fmt.Println(cyc, "minusphase ends; Dwt occured")
+			// Catching the rare occasion where stabilty drops in one cycle from above the plus threshold to below the minus threshold - ending trial if this happens
 			} else if ss.AvgLaySim < minusthresh && ss.PlusPhase == true {
 				ss.PlusPhase = false
 				pluscount = 0
@@ -1014,6 +1023,7 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 		}
 	}
 
+	// Reset sleep algorithm variables
 	pluscount = 0
 	minuscount = 0
 	ss.MinusPhase = false
@@ -1050,7 +1060,7 @@ func (ss *Sim) SleepCyc(c [][]float64) {
 	}
 }
 
-// DZ added for sleep
+// SleepTrial sets up one sleep trial
 func (ss *Sim) SleepTrial() {
 	ss.SleepCycInit()
 	ss.UpdateView("sleep")
@@ -1117,10 +1127,6 @@ func (ss *Sim) NewRun() {
 		pjperca3.Pattern().(*prjn.UnifRnd).RndSeed = ss.RndSeed
 		pjperca3.Build()
 
-		//pjca3per := ca3.SndPrjns.RecvName(layer).(*hip.CHLPrjn)
-		//pjca3per.Pattern().(*prjn.UnifRnd).RndSeed = ss.RndSeed
-		//pjca3per.Build()
-
 		pjperdg := dg.RcvPrjns.SendName(layer).(*hip.CHLPrjn)
 		pjperdg.Pattern().(*prjn.UnifRnd).RndSeed = ss.RndSeed
 		pjperdg.Build()
@@ -1129,7 +1135,7 @@ func (ss *Sim) NewRun() {
 	ss.Net.InitWts()
 
 
-	ss.TrainEnv.Trial.Max = ss.TrialPerEpc // DS added
+	ss.TrainEnv.Trial.Max = ss.TrialPerEpc
 
 	fmt.Println(ss.TrainEnv.Run.Cur)
 
