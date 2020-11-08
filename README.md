@@ -13,5 +13,5 @@ This is a hippocampal model (based on [Schapiro et. al. 2017a](https://cb17cd36-
 
 ## Variables that control sleep behaviour:
 The model relies on two mechanisms during sleep - (i) Synaptic Depression which allows the model to move between attractors (periods of high stability) and (ii) Oscillating Inhibition which reveals useful contrastive learning states.  
-Synaptic depression is controlled by the "inc" and "dec" parameters (line 463 in slp-rep.go) which specify the rate of increase and recovery from synaptic depression over time, respectively.
+Synaptic depression is controlled by the "inc" and "dec" parameters (line 463 in slp-rep.go) which specify the rate of increase and recovery from synaptic depression over time, respectively.  
 Layers in the network recieve either high or low amplitude oscillating inhibition (see from line 866 in slp-rep.go for the high/low groups). The amplitude for each is controlled via a sin wave equation which can be edited to change the various properties of the oscillations (see from line 1071 in slp-rep.go for the two equations).
